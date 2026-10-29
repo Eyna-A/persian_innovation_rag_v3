@@ -1,6 +1,3 @@
-# Persian Innovation FAQ RAG — بدون Chunking
-
-یک RAG فارسی برای پرسش‌وپاسخ‌های صندوق نوآوری و شکوفایی. در این نسخه **هر ردیف CSV دقیقاً یک سند در Weaviate است**؛ چون سؤال‌وجواب‌ها واحدهای معنایی کوتاه و مستقل‌اند، تقسیم متن به chunk انجام نمی‌شود.
 
 ## معماری
 
@@ -74,7 +71,7 @@ ENABLE_RERANKER=true
 
 ## ارزیابی Retrieval
 
-در `evaluation/evaluation_dataset.csv` مقدار `expected_source_question` را با متن دقیق سؤال متناظر در `data/innovation_faq.csv` پر کن. سپس:
+در `evaluation/evaluation_dataset.csv` مقدارexpected_source_question` را با متن دقیق سؤال متناظر در `data/innovation_faq.csv` پر کن. سپس:
 
 ```powershell
 python evaluate.py
