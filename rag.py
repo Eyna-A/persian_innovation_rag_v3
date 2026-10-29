@@ -18,7 +18,7 @@ from weaviate.classes.query import MetadataQuery
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
-CSV_PATH = ROOT / os.getenv("CSV_PATH", "data/innovation_faq.csv")
+CSV_PATH = ROOT / os.getenv("CSV_PATH", "data/faq_qa_pairs.csv")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "InnovationFAQ")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
@@ -98,27 +98,68 @@ def create_collection(client, reset: bool = False):
     return client.collections.get(COLLECTION_NAME)
 
 
+
 def ingest(client, embedder, reset: bool = False) -> None:
     df = load_faq()
     collection = create_collection(client, reset=reset)
-    # One vector per complete FAQ row; there is deliberately no chunking.
+
+    # One vector per complete FAQ row; no chunking.
     records = []
+
     for i, row in df.iterrows():
-        item = {"faq_id": str(i + 1), "source_row": int(i + 2), "category": row["category"],
-                "question": row["question"], "answer": row["answer"]}
+        item = {
+            "faq_id": str(i + 1),
+            "source_row": int(i + 2),
+            "category": row["category"],
+            "question": row["question"],
+            "answer": row["answer"],
+        }
+
         item["search_text"] = document_text(item)
         records.append(item)
+
     texts = [item["search_text"] for item in records]
-    vectors = embedder.encode(texts, batch_size=8, show_progress_bar=True,
-                              normalize_embeddings=True, convert_to_numpy=True)
+
+    vectors = embedder.encode(
+        texts,
+        batch_size=8,
+        show_progress_bar=True,
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+    )
+
     with collection.batch.dynamic() as batch:
         for item, vector in zip(records, vectors):
-            stable_id = uuid.uuid5(uuid.NAMESPACE_URL, f"innovation-faq:{item['faq_id']}:{item['question']}")
-            batch.add_object(properties=item, vector=vector.tolist(), uuid=stable_id)
+            stable_id = uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"innovation-faq:{item['faq_id']}:{item['question']}",
+            )
+
+            batch.add_object(
+                properties=item,
+                vector=vector.tolist(),
+                uuid=stable_id,
+            )
+
     failed = collection.batch.failed_objects
-    print(f"دیتاست: {len(df)} ردیف | تلاش برای ثبت: {len(records)} | خطاهای batch: {len(failed)}")
+
+    print(
+        f"دیتاست: {len(df)} ردیف | "
+        f"تلاش برای ثبت: {len(records)} | "
+        f"خطاهای batch: {len(failed)}"
+    )
+
     for failure in failed[:3]:
         print("خطای ثبت:", failure)
+
+    if failed:
+        raise RuntimeError(
+            f"ثبت {len(failed)} رکورد در Weaviate ناموفق بود."
+        )
+
+    print(f"ثبت موفق {len(records)} پرسش‌وپاسخ در Weaviate.")
+
+
 
 
 def retrieve(collection, embedder, query: str, top_k: int = TOP_K, alpha: float = HYBRID_ALPHA) -> list[dict[str, Any]]:
